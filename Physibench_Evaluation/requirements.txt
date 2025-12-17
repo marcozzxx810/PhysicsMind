@@ -1,0 +1,8 @@
+numpy==2.1.2
+opencv-python==4.12.0.88
+scipy==1.15.3
+tqdm==4.67.1
+segment-anything==1.0
+cotracker==3.0
+torch==2.7.1
+torchvision==0.22.1
