@@ -83,6 +83,59 @@ Each sample includes:
 
 We provide a unified evaluation toolkit to benchmark both VLMs and World Models.
 
+### Physibench Evaluation (Video Generation)
+
+We include a standalone toolkit under `Physibench_Evaluation/` for physics-aware evaluation of video generation in three canonical mechanics scenarios:
+
+- **Center of Mass**
+- **Lever Equilibrium**
+- **Newton's First Law**
+
+**Directory structure**
+
+```text
+Physibench_Evaluation/
+├── generate_masks.py         # Extract segmentation masks (SAM)
+├── generate_tracks.py        # Extract trajectories (CoTracker)
+├── compute_com_metrics.py    # Center of Mass: IoU, Center Distance
+├── compute_newton_metrics.py # Newton's First Law: 5 trajectory metrics
+├── compute_lever_metrics.py  # Lever Balance: Direction Accuracy
+└── requirements.txt
+```
+
+**Setup**
+
+```bash
+cd Physibench_Evaluation
+pip install -r requirements.txt
+```
+
+**Models**
+
+- **SAM**: auto-downloads on first run, or manually:
+
+  ```bash
+  wget https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth
+  ```
+
+- **CoTracker**: auto-downloads via `torch.hub` on first run.
+
+**Annotation format**
+
+- Mask generation:
+
+  ```json
+  {"video.mp4": {"objects": [{"point": [[x, y]]}]}}
+  ```
+
+- Track generation:
+
+  ```json
+  {"video.mp4": {"queries": [[frame, x, y], ...]}}
+  ```
+
+These scripts compute PhysicsMind's physics-aware metrics for generated videos and can be plugged into any video generation pipeline that outputs MP4s and the corresponding annotations in the above formats.
+
 ### VQA Evaluation
 Run the VQA benchmark to test reasoning capabilities on static frames or short clips. The evaluation reports accuracy across specific subtypes (e.g., "Rotation Prediction", "Equilibrium State").
 
@@ -95,7 +148,7 @@ python scripts/eval_vqa.py --model gpt-4o --task lever_equilibrium
 Evaluate generated videos using our **Physics-Aware Metrics**, which measure:
 * **Trajectory Consistency**: RMSE against ground truth motion.
 * **Geometric Fidelity**: Segmentation Mask IoU and Center of Mass offset.
-* **Physical Validity**: Check if the final state (e.g., lever tilt) matches the laws of physics.
+* **Physical Validity**: Check if the final state (e.g., lever tilt) matches the laws of physics).
 
 ```bash
 # Example command (scripts coming soon)
