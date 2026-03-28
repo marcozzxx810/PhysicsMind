@@ -41,16 +41,6 @@ We focus on three canonical mechanics scenarios:
 
 ---
 
-## To-Do
-
-- [ ] Release the full **PhysicsMind** dataset (Real & Sim).
-- [ ] Release VQA evaluation scripts and prompt templates.
-- [ ] Release Video Generation evaluation code (Physics-Aware Metrics).
-- [ ] Release pre-computed results for baseline models (GPT-4o, Gemini, Sora-2, etc.).
-- [ ] Host public leaderboard.
-
----
-
 ## Dataset
 
 The PhysicsMind dataset is organized by physical scenario and modality (Real vs. Simulation).
