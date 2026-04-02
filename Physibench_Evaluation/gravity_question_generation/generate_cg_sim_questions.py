@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-为悬挂法测物体重心模拟实验生成单选题。
-使用多模态LLM分析视频关键帧，生成：
-1. 重心位置选择题（靠上/靠下/中间/不在物体内）
-2. 旋转方向选择题（顺时针/逆时针/不旋转/摆动）
+Generate multiple-choice questions for the simulated suspended center-of-gravity
+experiment.
+Uses a multimodal LLM to analyze video keyframes and generate:
+1. Center-of-gravity position questions
+2. Rotation-direction questions
 """
 
 import os
@@ -19,7 +20,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 
 
-# 重心位置问题的提示词模板
+# Prompt template for center-of-gravity position questions
 CENTER_OF_GRAVITY_PROMPT = """You are a physics experiment analysis expert. Please carefully observe this image, which is the first frame from the "{experiment_name}" experiment.
 
 **Task**: Generate a single-choice question about the center of gravity position of the object in the image.
@@ -49,7 +50,7 @@ Now please generate the question:
 """
 
 
-# 旋转方向问题的提示词模板
+# Prompt template for rotation-direction questions
 ROTATION_DIRECTION_PROMPT = """You are a physics experiment analysis expert. Please carefully observe this image, which is the first frame from the "{experiment_name}" experiment.
 
 **Task**: Generate a detailed single-choice question about how the object will rotate when released.
@@ -77,15 +78,15 @@ Now please generate the question:
 
 def encode_image_to_base64(image_path: Path) -> Tuple[str, str]:
     """
-    将图片编码为base64字符串，并返回图片的MIME类型。
+    Encode an image as base64 and return its MIME type.
     
     Args:
-        image_path (Path): 图片文件路径
+        image_path (Path): Image file path
     
     Returns:
-        Tuple[str, str]: (Base64编码的图片字符串, MIME类型)
+        Tuple[str, str]: Base64 image string and MIME type
     """
-    # 根据文件扩展名确定MIME类型
+    # Determine the MIME type from the file extension.
     ext = image_path.suffix.lower()
     mime_type_map = {
         '.jpg': 'image/jpeg',
@@ -94,7 +95,7 @@ def encode_image_to_base64(image_path: Path) -> Tuple[str, str]:
         '.gif': 'image/gif',
         '.webp': 'image/webp',
     }
-    mime_type = mime_type_map.get(ext, 'image/jpeg')  # 默认使用jpeg
+    mime_type = mime_type_map.get(ext, 'image/jpeg')  # Default to JPEG.
     
     with open(image_path, 'rb') as image_file:
         base64_data = base64.b64encode(image_file.read()).decode('utf-8')
@@ -109,25 +110,25 @@ def generate_question_answer(
     experiment_name: str
 ) -> Tuple[str, str]:
     """
-    使用多模态LLM生成问题和答案。
+    Generate a question and answer with a multimodal LLM.
     
     Args:
-        llm (ChatOpenAI): LLM实例
-        prompt_template (str): 提示词模板
-        image_path (Path): 关键帧图片路径
-        experiment_name (str): 实验名称
+        llm (ChatOpenAI): LLM instance
+        prompt_template (str): Prompt template
+        image_path (Path): Keyframe image path
+        experiment_name (str): Experiment name
     
     Returns:
-        Tuple[str, str]: (生成的问题, 生成的答案)
+        Tuple[str, str]: Generated question and answer
     """
     try:
-        # 编码图片为base64并获取MIME类型
+        # Encode the image as base64 and get its MIME type.
         base64_image, mime_type = encode_image_to_base64(image_path)
         
-        # 格式化提示词
+        # Format the prompt.
         formatted_prompt = prompt_template.format(experiment_name=experiment_name)
         
-        # 创建包含图片的消息
+        # Create a message that includes the image.
         message = HumanMessage(
             content=[
                 {
@@ -143,31 +144,31 @@ def generate_question_answer(
             ],
         )
         
-        # 生成回复
+        # Generate the response.
         response = llm.invoke([message])
         response_text = response.content.strip()
         
-        # 检查是否为空响应
+        # Check for an empty or unusably short response.
         if not response_text or len(response_text) < 10:
-            print(f"  错误: 模型返回了空响应或过短的响应")
+            print(f"  Error: model returned an empty or too-short response")
             return "[ERROR: Empty Response]", "[ERROR]"
         
-        # 解析回复 - 格式为 "Question: ... Answer: ..."
+        # Parse responses of the form "Question: ... Answer: ...".
         if "Question:" in response_text and "Answer:" in response_text:
             parts = response_text.split("Answer:")
             question_part = parts[0].replace("Question:", "").strip()
             answer_part = parts[1].strip()
             
-            # 保持问题的多行格式（包含选项），只在最后清理
+            # Preserve the question format until final cleanup.
             question = question_part
             answer = answer_part
         else:
-            # Fallback 解析
+            # Fallback parsing.
             lines = response_text.strip().split('\n')
             question = lines[0] if lines else "[Generated Question]"
             answer = lines[1] if len(lines) > 1 else "[Generated Answer]"
         
-        # 提取单个字母答案 (A/B/C/D)
+        # Extract a single answer letter (A/B/C/D).
         answer_upper = answer.upper()
         extracted_answer = None
         
@@ -176,18 +177,18 @@ def generate_question_answer(
                 extracted_answer = char
                 break
         
-        # 清理问题 - 将换行符替换为空格，使其成为单行
+        # Normalize the question to a single line.
         question = question.replace('\n', ' ').strip()
         
         if extracted_answer:
             return question, extracted_answer
         else:
-            print(f"  警告: 无法从回复中提取答案字母")
-            print(f"  原始答案: {answer}")
+            print(f"  Warning: could not extract an answer letter from the response")
+            print(f"  Raw answer: {answer}")
             return question, "[PARSE_ERROR]"
             
     except Exception as e:
-        print(f"  错误: 生成问题时出错: {e}")
+        print(f"  Error: failed to generate the question: {e}")
         return "[ERROR]", "[ERROR]"
 
 
@@ -200,22 +201,22 @@ def process_dataset(
     retry_delay: int = 1
 ):
     """
-    处理CSV数据集，为每个条目生成问题和答案。
+    Process a CSV dataset and generate a question and answer for each entry.
     
     Args:
-        input_csv_path (Path): 输入CSV路径
-        output_csv_path (Path): 输出CSV路径
-        dataset_root (Path): 数据集根目录
-        model_name (str): 使用的模型名称
-        max_retries (int): 最大重试次数
-        retry_delay (int): 重试延迟（秒）
+        input_csv_path (Path): Input CSV path
+        output_csv_path (Path): Output CSV path
+        dataset_root (Path): Dataset root directory
+        model_name (str): Model name to use
+        max_retries (int): Maximum number of retries
+        retry_delay (int): Retry delay in seconds
     """
-    # 初始化LLM
-    print(f"初始化模型: {model_name}")
+    # Initialize the LLM.
+    print(f"Initializing model: {model_name}")
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        print("错误: 未设置 OPENROUTER_API_KEY 环境变量")
-        print("请运行: export OPENROUTER_API_KEY='your-api-key'")
+        print("Error: OPENROUTER_API_KEY environment variable is not set")
+        print("Run: export OPENROUTER_API_KEY='your-api-key'")
         sys.exit(1)
     
     llm = ChatOpenAI(
@@ -231,15 +232,15 @@ def process_dataset(
         }
     )
     
-    # 读取输入CSV
+    # Read the input CSV.
     rows = []
     with open(input_csv_path, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         rows = list(reader)
     
-    print(f"从 {input_csv_path} 读取了 {len(rows)} 个条目")
+    print(f"Read {len(rows)} entries from {input_csv_path}")
     
-    # 处理每一行
+    # Process each row.
     processed_count = 0
     error_count = 0
     
@@ -249,27 +250,27 @@ def process_dataset(
         keyframe_path = row['key_frame_path']
         question_category = row['question_category']
         
-        print(f"\n[{idx}/{len(rows)}] 处理: {video_path}")
-        print(f"  类别: {question_category}")
+        print(f"\n[{idx}/{len(rows)}] Processing: {video_path}")
+        print(f"  Category: {question_category}")
         
-        # 构建完整的图片路径
+        # Build the full image path.
         full_image_path = dataset_root / keyframe_path
         
         if not full_image_path.exists():
-            print(f"  错误: 图片不存在: {full_image_path}")
+            print(f"  Error: image not found: {full_image_path}")
             error_count += 1
             continue
         
-        # 根据问题类别选择提示词
+        # Select the prompt template based on the question category.
         if question_category == 'center_of_gravity':
             prompt_template = CENTER_OF_GRAVITY_PROMPT
         elif question_category == 'rotation_direction':
             prompt_template = ROTATION_DIRECTION_PROMPT
         else:
-            print(f"  警告: 未知的问题类别: {question_category}")
+            print(f"  Warning: unknown question category: {question_category}")
             continue
         
-        # 生成问题和答案（带重试机制）
+        # Generate the question and answer with retry support.
         success = False
         for attempt in range(max_retries):
             try:
@@ -282,30 +283,29 @@ def process_dataset(
                 
                 if question != "[ERROR]" and answer != "[ERROR]" and answer != "[PARSE_ERROR]":
                     row['question'] = question
-                    # 注意：不要填充ground truth，留空给用户手动填写
-                    # row['ground truth'] 保持为空
+                    # Leave `ground truth` empty for manual verification.
                     processed_count += 1
                     success = True
-                    print(f"  ✓ 问题生成成功")
-                    print(f"  生成的答案（仅供参考）: {answer}")
-                    print(f"  ⚠️  ground truth 留空，需要手动验证填写")
+                    print(f"  ✓ Question generated successfully")
+                    print(f"  Generated answer (for reference only): {answer}")
+                    print(f"  ⚠️  The `ground truth` field is intentionally left blank for manual verification")
                     break
                 else:
-                    raise Exception("生成返回错误标记")
+                    raise Exception("Model returned an error marker")
                     
             except Exception as e:
                 if attempt < max_retries - 1:
-                    print(f"  ⚠ 尝试 {attempt + 1} 失败: {e}")
-                    print(f"  等待 {retry_delay} 秒后重试...")
+                    print(f"  ⚠ Attempt {attempt + 1} failed: {e}")
+                    print(f"  Retrying in {retry_delay} seconds...")
                     time.sleep(retry_delay)
                 else:
-                    print(f"  ✗ 所有尝试都失败了")
+                    print(f"  ✗ All attempts failed")
                     error_count += 1
         
         if not success:
-            print(f"  跳过此条目")
+            print(f"  Skipping this entry")
     
-    # 写入输出CSV
+    # Write the output CSV.
     output_csv_path.parent.mkdir(parents=True, exist_ok=True)
     
     with open(output_csv_path, 'w', newline='', encoding='utf-8') as f:
@@ -316,85 +316,85 @@ def process_dataset(
             writer.writerows(rows)
     
     print(f"\n" + "="*60)
-    print(f"处理完成！")
-    print(f"成功生成: {processed_count} 个问题")
-    print(f"失败/错误: {error_count} 个")
-    print(f"输出文件: {output_csv_path}")
-    print(f"\n⚠️  重要提示:")
-    print(f"  - 所有问题已生成，但 ground truth 列为空")
-    print(f"  - 请手动检查每个问题并填写正确答案")
-    print(f"  - 生成的答案仅供参考，不一定正确")
+    print(f"Processing complete")
+    print(f"Questions generated successfully: {processed_count}")
+    print(f"Failures/errors: {error_count}")
+    print(f"Output file: {output_csv_path}")
+    print(f"\n⚠️  Important:")
+    print(f"  - All questions have been generated, but the `ground truth` column is still empty")
+    print(f"  - Manually review each question and fill in the correct answer")
+    print(f"  - The generated answer is only a reference and may be incorrect")
     print("="*60)
 
 
 def main():
-    """主函数：处理命令行参数并生成问题。"""
+    """Parse command-line arguments and generate questions."""
     parser = argparse.ArgumentParser(
-        description="为悬挂法测物体重心模拟实验生成单选题"
+        description="Generate multiple-choice questions for the simulated suspended center-of-gravity experiment"
     )
     parser.add_argument(
         "dataset_path",
         type=str,
-        help="数据集根目录路径（Dataset_V2）"
+        help="Path to the dataset root directory (Dataset_V2)"
     )
     parser.add_argument(
         "--csv",
         type=str,
         required=True,
-        help="输入CSV文件路径（由build_csv_cg_sim.py生成）"
+        help="Input CSV file path generated by build_csv_cg_sim.py"
     )
     parser.add_argument(
         "--output",
         type=str,
         default="/root/PhysBench/output/apl/dataset_cg_sim_with_questions.csv",
-        help="输出CSV文件路径 (默认: /root/PhysBench/output/apl/dataset_cg_sim_with_questions.csv)"
+        help="Output CSV file path (default: /root/PhysBench/output/apl/dataset_cg_sim_with_questions.csv)"
     )
     parser.add_argument(
         "--model",
         type=str,
         default="openai/gpt-4o",
-        help="使用的模型名称 (默认: openai/gpt-4o)"
+        help="Model name to use (default: openai/gpt-4o)"
     )
     parser.add_argument(
         "--max-retries",
         type=int,
         default=2,
-        help="API调用失败时的最大重试次数 (默认: 2)"
+        help="Maximum number of retries for API failures (default: 2)"
     )
     parser.add_argument(
         "--retry-delay",
         type=int,
         default=1,
-        help="重试之间的延迟秒数 (默认: 1)"
+        help="Delay between retries in seconds (default: 1)"
     )
     
     args = parser.parse_args()
     
-    # 检查环境变量
+    # Check required environment variables.
     if not os.getenv("OPENROUTER_API_KEY"):
-        print("错误: 未设置 OPENROUTER_API_KEY 环境变量")
-        print("请运行: export OPENROUTER_API_KEY='your-api-key'")
+        print("Error: OPENROUTER_API_KEY environment variable is not set")
+        print("Run: export OPENROUTER_API_KEY='your-api-key'")
         sys.exit(1)
     
     dataset_path = Path(args.dataset_path)
     input_csv_path = Path(args.csv)
     output_csv_path = Path(args.output)
     
-    # 验证路径
+    # Validate paths.
     if not dataset_path.exists():
-        print(f"错误: 数据集路径不存在: {dataset_path}")
+        print(f"Error: dataset path does not exist: {dataset_path}")
         sys.exit(1)
     
     if not input_csv_path.exists():
-        print(f"错误: 输入CSV文件不存在: {input_csv_path}")
+        print(f"Error: input CSV file does not exist: {input_csv_path}")
         sys.exit(1)
     
-    print(f"悬挂法测物体重心 - 问题生成器")
-    print(f"数据集路径: {dataset_path}")
-    print(f"输入CSV: {input_csv_path}")
-    print(f"输出CSV: {output_csv_path}")
-    print(f"模型: {args.model}")
-    print(f"最大重试次数: {args.max_retries}")
+    print(f"Suspended center-of-gravity question generator")
+    print(f"Dataset path: {dataset_path}")
+    print(f"Input CSV: {input_csv_path}")
+    print(f"Output CSV: {output_csv_path}")
+    print(f"Model: {args.model}")
+    print(f"Max retries: {args.max_retries}")
     print()
     
     process_dataset(
@@ -409,6 +409,5 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
 
